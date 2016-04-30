@@ -43,3 +43,8 @@ err = client.Set("themes", json)
 		beego.Notice(posts)
 		num, err := o.Raw("SELECT  `pacname` as `packageName` ,`version`,`title`,`zip_source` as `downloadUrl`,`theme_url` as `previewImageUrl`  FROM `postinfo` where `status`=1").Values(&maps)
 ```
+
+
+## 测试结论
+* 内存比redis快一个数量级
+* redis比mysql快一个数量级
