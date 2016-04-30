@@ -17,4 +17,5 @@ func init() {
 	beego.Router("/postinfos", &controllers.PostinfosController{})
 	beego.Router("/postinfo/:id:string", &controllers.PostinfoController{})
 	beego.Router("/redis", &controllers.RedisController{})
+	beego.Router("/caches", &controllers.LocalController{})
 }

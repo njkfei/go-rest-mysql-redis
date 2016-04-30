@@ -15,6 +15,7 @@ var (
 	host string
 	db string
 	dns string
+	posts []Postinfo
 )
 
 func init() {
@@ -60,7 +61,7 @@ func GetAllPostinfos() []Postinfo {
 		val []byte
 	 	err error
 		post Postinfo
-	 	posts []Postinfo
+
 		maps []orm.Params
 	)
 	val, err = client.Get("themes");
@@ -152,4 +153,30 @@ func maptoPostinfo(maps map[string] interface{})(post Postinfo){
 	}
 
 	return  post
+}
+
+func GetCaches()( []Postinfo)  {
+	var (
+	//	post Postinfo
+		maps []orm.Params
+	)
+
+	if(len(posts) > 0){
+		return posts
+	}
+
+	o := orm.NewOrm()
+	o.Using("yii2basic")
+	num, err := o.Raw("SELECT  `pacname` as `packageName` ,`version`,`title`,`zip_source` as `downloadUrl`,`theme_url` as `previewImageUrl`  FROM `postinfo` where `status`=1").Values(&maps)
+	if err == nil && num > 0 {
+		var index int64
+		beego.Notice(num)
+		for index = 0; index < num; index++ {
+			beego.Notice(maps[index]) // slene
+			post := maptoPostinfo(maps[index])
+			posts[index] = post
+		}
+	}
+
+	return posts
 }
