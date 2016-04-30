@@ -6,25 +6,32 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
-
+	 "encoding/json"
 )
 var (
-	PostinfoList map[string]*Postinfo
 	client goredis.Client
+	user string
+	password string
+	host string
+	db string
+	dns string
 )
 
 func init() {
-	PostinfoList = make(map[string]*Postinfo)
-	u := Postinfo{"1", "astaxie", "11111",1,"test","test","test","test","test",2}
-	PostinfoList["1"] = &u
+	user = beego.AppConfig.String("mysqluser")
+	password = beego.AppConfig.String("mysqlpass")
+	host = beego.AppConfig.String("mysqlurls")
+	db = beego.AppConfig.String("mysqldb")
+	dns = beego.AppConfig.String("mysqldns")
 
 	orm.RegisterDriver("mysql", orm.DRMySQL)
 
-	orm.RegisterDataBase("default", "mysql", "root:rootroot@/yii2basic?charset=utf8")
+	orm.RegisterDataBase("default", "mysql",dns)
 
 
 	// register model
-	orm.RegisterModel(new(Postinfo))
+	//orm.RegisterModel(new(Postinfo))
+	orm.RegisterModel(new (User))
 
 	// create table
 	orm.RunSyncdb("default", false, true)
@@ -33,93 +40,71 @@ func init() {
 
 }
 
-/*
-  `id` int(5) NOT NULL AUTO_INCREMENT,
-  `pacname` varchar(100) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL,
-  `version` varchar(30) DEFAULT NULL,
-  `version_in` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `title` varchar(100) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL,
-  `zip_source` varchar(200) DEFAULT NULL,
-  `zip_name` varchar(200) DEFAULT NULL,
-  `themepic` varchar(200) DEFAULT NULL,
-  `theme_url` varchar(100) DEFAULT NULL,
-  `status` int(5) DEFAULT '0',
-  PRIMARY KEY (`id`)
- */
+type User struct {
+	Id int32 `orm:"pk"`
+}
 
 type Postinfo struct {
-	Id       string `orm:"pk"`
-	Pacname string
+	Id       int32 `orm:"pk"`
+	PackageName string
 	Version string
-	Version_in int32
 	Title string
-	Zip_source string
-	Zip_name string
-	Theme_pic string
-	Theme_url string
-	Status int32
+	DownloadUrl string
+	PreviewImageUrl string
 }
 
 
 func GetAllPostinfos() []Postinfo {
-/*	db, err := sql.Open("mysql", "root:rootroot@/yii2basic")
-	if err != nil {
-		panic(err.Error())  // Just for example purpose. You should use proper error handling instead of panic
-	}
-	defer db.Close()
 
-	// Prepare statement for inserting data
-	stmtIns, err := db.Prepare("SELECT * FROM postinfo") // ? = placeholder
-	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
-	}
-	defer stmtIns.Close() // Close the statement when we leave main() / the program terminates
+	var (
+		val []byte
+	 	err error
+		post Postinfo
+	 	posts []Postinfo
+		maps []orm.Params
+	)
+	val, err = client.Get("themes");
 
-	beego.Notice(stmtIns)*/
-
-	var val []byte
-	var err error
-
-	err = client.Set("a", []byte("hello"))
-
-	if err != nil {
-		beego.Notice("set failed", err.Error())
-	}
-
-	if val, err = client.Get("a"); err != nil || string(val) != "hello" {
+	if  err != nil || string(val) != "hello" {
 		beego.Notice("get failed")
+		o := orm.NewOrm()
+		o.Using("yii2basic")
+
+
+		num,err1 := o.Raw("SELECT `id`, `pacname` as `packageName` ,`version`,`title`,`zip_source` as `downloadUrl`,`theme_url` as `previewImageUrl`  FROM `postinfo` where `status`=1").QueryRows(&posts)
+
+		if err1 != nil {
+			beego.Notice("select error")
+		}
+		beego.Notice(num)
+		beego.Notice(posts)
+		num, err := o.Raw("SELECT  `pacname` as `packageName` ,`version`,`title`,`zip_source` as `downloadUrl`,`theme_url` as `previewImageUrl`  FROM `postinfo` where `status`=1").Values(&maps)
+		if err == nil && num > 0 {
+			var index int64
+			beego.Notice(num)
+			for index = 0; index < num; index++ {
+				beego.Notice(maps[index]) // slene
+				post = maptoPostinfo(maps[index])
+				posts[index] = post
+				//FillStruct(maps[index],post[index])
+				//beego.Notice(post[index])
+			}
+		}
+
+		beego.Notice(maps)
+		json,err := json.Marshal(posts);
+		//beego.Notice(json)
+		if err == nil {
+			err = client.Set("themes", json)
+		}
+
+		return posts
 	}
 
-	beego.Notice(val)
 
-	if typ, err := client.Type("a"); err != nil || typ != "string" {
-		beego.Notice("type failed", typ)
-	}
+	err = json.Unmarshal(val,posts)
 
-	//if keys, err := client.Keys("*"); err != nil || len(keys) != 1 {
-	//    t.Notice("keys failed", keys)
-	//}
-
-	//client.Del("a")
-
-	if ok, _ := client.Exists("a"); ok {
-		beego.Notice("Should be deleted")
-	}
-
-	var post []Postinfo
-	o := orm.NewOrm()
-	o.Using("yii2basic")
-
-	num,err1 := o.Raw("SELECT * FROM postinfo WHERE 1=1").QueryRows(&post)
-
-	if err1 == nil {
-		beego.Notice("select error")
-	}
-	beego.Notice(num)
-
-	beego.Notice(post)
-
-	return post
+	return posts
 }
 
 func GetPostinfo(id string)(ret Postinfo)  {
@@ -127,7 +112,7 @@ func GetPostinfo(id string)(ret Postinfo)  {
 	o := orm.NewOrm()
 	o.Using("yii2basic")
 
-	err := o.Raw("SELECT * FROM postinfo WHERE id = ?", id).QueryRow(&post)
+	 err := o.Raw("SELECT `id`, `pacname` as `packageName` ,`version`,`title`,`zip_source` as `downloadUrl`,`theme_url` as `previewImageUrl`  FROM `postinfo` where `status`=1 and id = ?", id).QueryRow(&post)
 
 	if err == nil {
 		beego.Notice("select error")
@@ -136,4 +121,35 @@ func GetPostinfo(id string)(ret Postinfo)  {
 	beego.Notice(post)
 
 	return post
+}
+
+func ClearRedis()[]Postinfo{
+	_,_ = client.Del("themes");
+
+
+	return GetAllPostinfos()
+}
+
+func maptoPostinfo(maps map[string] interface{})(post Postinfo){
+	if str,ok := maps[`packageName`].(string); ok{
+		post.PackageName = str
+	}
+
+	if str,ok := maps[`downloadUrl`].(string); ok{
+		post.DownloadUrl = str
+	}
+
+	if str,ok := maps[`previewImageUrl`].(string); ok{
+		post.PreviewImageUrl = str
+	}
+
+	if str,ok := maps[`title`].(string); ok{
+		post.Title = str
+	}
+
+	if str,ok := maps[`version`].(string); ok{
+		post.Version = str
+	}
+
+	return  post
 }

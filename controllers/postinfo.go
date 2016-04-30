@@ -9,14 +9,6 @@ type PostinfoController struct {
 	beego.Controller
 }
 
-func (p PostinfoController) GetAll(){
-	posts := models.GetAllPostinfos()
-	p.Data["json"] = posts
-	beego.Notice(posts)
-	beego.Notice(p)
-	p.ServeJSON()
-}
-
 func (p PostinfoController) Get(){
 	id := p.Ctx.Input.Param(":id")
 
